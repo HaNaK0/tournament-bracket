@@ -1,4 +1,4 @@
-use bevy::{prelude::*, input::keyboard::KeyboardInput};
+use bevy::{prelude::*};
 
 fn main() {
     App::new()
@@ -7,7 +7,7 @@ fn main() {
                 primary_window: Some(Window { 
                     resolution: (640.0, 480.0).into(), 
                     resizable: false,
-                    title: format!("rustiant"), 
+                    title: "rustiant".to_string(), 
                     ..default()
                 }),
                 ..default()
