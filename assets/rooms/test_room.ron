@@ -1,0 +1,16 @@
+(
+    prefabs: [
+        (
+            type: "Player",
+            fields: {
+                "sprite" : "sprites/icon.png",
+                "position" : "(0, 0)",
+                "speed" : 300,
+            }
+        ),
+        (
+            type: "PigParent",
+            fields: { },
+        )
+    ]
+)
