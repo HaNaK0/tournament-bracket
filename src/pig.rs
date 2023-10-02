@@ -6,7 +6,6 @@ pub struct PigPlugin;
 
 impl Plugin for PigPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_pig_parent_system);
         app.add_systems(Update, (spawn_pig_system, update_pig_system));
     }
 }
@@ -18,11 +17,7 @@ struct Pig {
 }
 
 #[derive(Component)]
-struct PigParent;
-
-fn spawn_pig_parent_system(mut commands: Commands) {
-    commands.spawn((SpatialBundle::default(), PigParent, Name::new("Pig Parent")));
-}
+pub struct PigParent;
 
 fn spawn_pig_system(
     mut commands: Commands,

@@ -3,9 +3,11 @@ use bevy::{
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use pig::PigPlugin;
+use room::RoomPlugin;
 use ui::GameUiPlugin;
 
 mod pig;
+mod room;
 mod ui;
 
 #[derive(Component)]
@@ -31,6 +33,7 @@ fn main() {
             PigPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::F3)),
             GameUiPlugin,
+            RoomPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, movement_system)
@@ -38,7 +41,7 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(mut commands: Commands) {
     let mut camera = Camera2dBundle::default();
 
     camera.projection.scaling_mode = ScalingMode::AutoMin {
@@ -47,18 +50,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     };
 
     commands.spawn(camera);
-
-    let texture = asset_server.load("sprites/bevy-icon.png");
-
-    commands.spawn((
-        SpriteBundle {
-            sprite: Sprite { ..default() },
-            texture,
-            ..default()
-        },
-        Player { speed: 300.0 },
-        Name::new("Player"),
-    ));
 }
 
 fn movement_system(

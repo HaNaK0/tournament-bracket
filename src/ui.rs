@@ -48,10 +48,7 @@ fn spawn_ui_system(mut commands: Commands) {
         });
 }
 
-fn update_money_ui_system(
-    mut money_text: Query<&mut Text, With<MoneyText>>,
-    money: Res<Money>,
-) {
+fn update_money_ui_system(mut money_text: Query<&mut Text, With<MoneyText>>, money: Res<Money>) {
     let mut text = money_text.single_mut();
 
     text.sections[0].value = format!("Gold {}", money.0)
