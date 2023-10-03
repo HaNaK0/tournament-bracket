@@ -31,7 +31,7 @@ fn main() {
                 ..default()
             }),
             PigPlugin,
-            WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::F3)),
+            WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F3)),
             GameUiPlugin,
             RoomPlugin,
         ))
