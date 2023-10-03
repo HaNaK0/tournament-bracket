@@ -1,7 +1,4 @@
-use bevy::{
-    prelude::*,
-    utils::HashMap, ecs::system::EntityCommands,
-};
+use bevy::{ecs::system::EntityCommands, prelude::*, utils::HashMap};
 use serde::{Deserialize, Serialize};
 
 use crate::Player;
@@ -17,21 +14,29 @@ impl Room {
     fn generate_test_room() -> Self {
         let player_fields = [
             ("speed".to_string(), Some(PrefabField::Number(300.0))),
-            ("position".to_string(), Some(PrefabField::String("(0.0, 0.0)".to_string()))),
-            ("sprite".to_string(), Some(PrefabField::String("sprites\\bevy-icon.png".to_string()))),
-            ];
+            (
+                "position".to_string(),
+                Some(PrefabField::String("(0.0, 0.0)".to_string())),
+            ),
+            (
+                "sprite".to_string(),
+                Some(PrefabField::String("sprites\\bevy-icon.png".to_string())),
+            ),
+        ];
 
         let player_prefab = PrefabData {
-            prefab_type : "Player".to_string(),
-            fields : HashMap::from_iter(player_fields.into_iter()),
+            prefab_type: "Player".to_string(),
+            fields: HashMap::from_iter(player_fields.into_iter()),
         };
 
         let pig_parent_prefab = PrefabData {
-            prefab_type : "PigParent".to_string(),
+            prefab_type: "PigParent".to_string(),
             fields: HashMap::new(),
         };
 
-        Room {prefabs: vec![player_prefab, pig_parent_prefab]}
+        Room {
+            prefabs: vec![player_prefab, pig_parent_prefab],
+        }
     }
 }
 
@@ -110,7 +115,11 @@ impl Prefab for PigParentPrefab {
         mut commands: EntityCommands,
         _asset_server: &AssetServer,
     ) {
-        commands.insert((Name::new("PigParent"), crate::pig::PigParent {}, SpatialBundle::default()));
+        commands.insert((
+            Name::new("PigParent"),
+            crate::pig::PigParent {},
+            SpatialBundle::default(),
+        ));
     }
 }
 
@@ -129,24 +138,41 @@ impl Plugin for RoomPlugin {
 
 #[derive(Default, Resource)]
 pub struct PrefabRegistry {
-    prefabs: HashMap<String, Box<dyn Fn(HashMap<String, Option<PrefabField>>, EntityCommands, &AssetServer) + Send + Sync>>,
+    prefabs: HashMap<
+        String,
+        Box<
+            dyn Fn(HashMap<String, Option<PrefabField>>, EntityCommands, &AssetServer)
+                + Send
+                + Sync,
+        >,
+    >,
 }
 
 impl PrefabRegistry {
     fn register_prefab(
         &mut self,
         name: &str,
-        spawn_fn: impl Fn(HashMap<String, Option<PrefabField>>, EntityCommands, &AssetServer) + 'static + Send + Sync,
+        spawn_fn: impl Fn(HashMap<String, Option<PrefabField>>, EntityCommands, &AssetServer)
+            + 'static
+            + Send
+            + Sync,
     ) {
-        self.prefabs
-            .insert(name.to_string(), Box::new(spawn_fn));
+        self.prefabs.insert(name.to_string(), Box::new(spawn_fn));
     }
 }
 
-fn load_room(mut commands: Commands, asset_server: Res<AssetServer>, registry: Res<PrefabRegistry>) {
+fn load_room(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    registry: Res<PrefabRegistry>,
+) {
     let room = Room::generate_test_room();
 
     for prefab_data in room.prefabs {
-        registry.prefabs[&prefab_data.prefab_type](prefab_data.fields, commands.spawn_empty(), &asset_server)
+        registry.prefabs[&prefab_data.prefab_type](
+            prefab_data.fields,
+            commands.spawn_empty(),
+            &asset_server,
+        )
     }
 }
