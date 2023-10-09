@@ -3,10 +3,12 @@ use bevy::{
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use pig::PigPlugin;
-use room::RoomPlugin;
+use prefab::DefaultPrefabsPlugin;
+use room::{LoadRoomEvent, RoomPlugin};
 use ui::GameUiPlugin;
 
 mod pig;
+mod prefab;
 mod room;
 mod ui;
 
@@ -34,6 +36,7 @@ fn main() {
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F3)),
             GameUiPlugin,
             RoomPlugin,
+            DefaultPrefabsPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, movement_system)
@@ -41,7 +44,8 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, mut load_events: EventWriter<LoadRoomEvent>) {
+    debug!("set up");
     let mut camera = Camera2dBundle::default();
 
     camera.projection.scaling_mode = ScalingMode::AutoMin {
@@ -50,6 +54,8 @@ fn setup(mut commands: Commands) {
     };
 
     commands.spawn(camera);
+
+    load_events.send(LoadRoomEvent::new("rooms/test_room.ron".into()));
 }
 
 fn movement_system(

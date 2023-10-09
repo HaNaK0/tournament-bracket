@@ -3,9 +3,9 @@
         (
             type: "Player",
             fields: {
-                "sprite" : "sprites/icon.png",
-                "position" : "(0, 0)",
-                "speed" : 300,
+                "sprite" : String("sprites/bevy-icon.png"),
+                "position" : String("(0, 0)"),
+                "speed" : Number(300.0),
             }
         ),
         (
