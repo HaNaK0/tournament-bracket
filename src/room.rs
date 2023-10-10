@@ -129,6 +129,10 @@ fn parse_room_system(
     room_assets: Res<Assets<Room>>,
     asset_server: Res<AssetServer>,
 ) {
+    if room_tracker.rooms.iter().filter(|r| !r.is_parsed()).count() == 0 {
+        return;
+    }
+
     room_tracker.rooms = room_tracker
         .rooms
         .iter()
