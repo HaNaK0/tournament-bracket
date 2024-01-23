@@ -12,14 +12,16 @@ impl Plugin for DefaultPrefabsPlugin {
 
 fn setup(mut registry: ResMut<PrefabRegistry>) {
     trace!("prefab plugin setup");
-    registry.register_prefab("Player", PlayerPrefab::spawn_prfab);
-    registry.register_prefab("PigParent", PigParentPrefab::spawn_prfab)
+
+    registry.register_prefab("Player", PlayerPrefab);
+    registry.register_prefab("PigParent", PigParentPrefab);
 }
 
 pub struct PlayerPrefab;
 
 impl Prefab for PlayerPrefab {
     fn spawn_prfab(
+        &self,
         fields: &HashMap<String, PrefabField>,
         mut commands: EntityCommands,
         asset_server: &AssetServer,
@@ -64,12 +66,48 @@ impl Prefab for PlayerPrefab {
             warn!("sprite or speed has wrong type");
         }
     }
+
+    fn update_prfab(
+        &self,
+        changed_fields: &HashMap<String, PrefabField>,
+        asset_server: &AssetServer,
+        mut commands: EntityCommands,
+    ) {
+        changed_fields
+            .iter()
+            .map(|(name, field)| match name.as_str() {
+                "sprite" => {
+                    if let PrefabField::String(path) = field {
+                        commands.remove::<Handle<Image>>();
+
+                        let texture: Handle<Image> = asset_server.load(path);
+                        commands.insert(texture);
+                    } else {
+                        warn!("sprite filed expected string but got different type: {field:?}")
+                    }
+                }
+                "speed" => {
+                    if let PrefabField::Number(speed) = field {
+                        commands.remove::<crate::Player>();
+
+                        commands.insert(crate::Player {
+                            speed: *speed as f32,
+                        });
+                    } else {
+                        warn!("sprite filed expected string but got different type: {field:?}")
+                    }
+                }
+                _ => warn!("A player does not have a field named {}", name),
+            })
+            .count();
+    }
 }
 
 pub struct PigParentPrefab;
 
 impl Prefab for PigParentPrefab {
     fn spawn_prfab(
+        &self,
         _fields: &HashMap<String, PrefabField>,
         mut commands: EntityCommands,
         _asset_server: &AssetServer,
@@ -79,5 +117,14 @@ impl Prefab for PigParentPrefab {
             crate::pig::PigParent {},
             SpatialBundle::default(),
         ));
+    }
+
+    fn update_prfab(
+        &self,
+        _changed_fields: &HashMap<String, PrefabField>,
+        _asset_server: &AssetServer,
+        _commands: EntityCommands,
+    ) {
+        // Nothing to update
     }
 }

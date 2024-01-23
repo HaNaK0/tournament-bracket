@@ -1,6 +1,6 @@
 (
-    prefabs: [
-        (
+    prefabs: {
+        "player" : (
             type: "Player",
             fields: {
                 "sprite" : String("sprites/bevy-icon.png"),
@@ -8,9 +8,9 @@
                 "speed" : Number(300.0),
             }
         ),
-        (
+        "pig_parent" : (
             type: "PigParent",
             fields: { },
-        )
-    ]
+       )
+    }
 )

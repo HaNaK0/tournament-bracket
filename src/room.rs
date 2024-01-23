@@ -3,32 +3,63 @@ use bevy::{
     ecs::system::EntityCommands,
     prelude::*,
     reflect::{TypePath, TypeUuid},
-    utils::HashMap,
+    utils::{HashMap, HashSet},
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 pub struct RoomPlugin;
 
 impl Plugin for RoomPlugin {
     fn build(&self, app: &mut App) {
         app.add_asset::<Room>();
-        app.add_event::<LoadRoomEvent>();
         app.init_resource::<PrefabRegistry>();
         app.init_resource::<RoomTracker>();
         app.add_asset_loader(RoomLoader);
-        app.add_systems(Update, (load_room_system, parse_room_system));
+        app.add_systems(Update, parse_room_system);
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Deserialize, TypePath, TypeUuid, Debug)]
+#[uuid = "23c6bd8f-a194-43f3-93be-9a3f95354c7f"]
+pub struct Room {
+    prefabs: HashMap<String, PrefabData>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PrefabData {
     #[serde(rename = "type")]
     pub prefab_type: String,
     pub fields: HashMap<String, PrefabField>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl PrefabData {
+    fn get_changed_fields(
+        old_prefab: &PrefabData,
+        new_prefab: &PrefabData,
+    ) -> HashMap<String, PrefabField> {
+        if old_prefab.prefab_type != new_prefab.prefab_type {
+            warn!("trying to find changed fields of prefabs of different types (old_prefab: {}, new_prefab: {})", old_prefab.prefab_type, new_prefab.prefab_type);
+            return HashMap::new();
+        }
+
+        new_prefab
+            .fields
+            .iter()
+            .filter_map(|(key, field)| match old_prefab.fields.get(key) {
+                Some(other_field) => {
+                    if other_field != field {
+                        Some((key.clone(), field.clone()))
+                    } else {
+                        None
+                    }
+                }
+                None => Some((key.clone(), field.clone())),
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum PrefabField {
     String(String),
     Number(f64),
@@ -37,16 +68,18 @@ pub enum PrefabField {
 
 pub trait Prefab {
     fn spawn_prfab(
+        &self,
         fields: &HashMap<String, PrefabField>,
         commands: EntityCommands,
         asset_server: &AssetServer,
     );
-}
 
-#[derive(Deserialize, TypePath, TypeUuid, Debug)]
-#[uuid = "23c6bd8f-a194-43f3-93be-9a3f95354c7f"]
-pub struct Room {
-    prefabs: Vec<PrefabData>,
+    fn update_prfab(
+        &self,
+        changed_fields: &HashMap<String, PrefabField>,
+        asset_server: &AssetServer,
+        commands: EntityCommands,
+    );
 }
 
 /// The assetloader
@@ -60,6 +93,7 @@ impl AssetLoader for RoomLoader {
         load_context: &'a mut bevy::asset::LoadContext,
     ) -> bevy::utils::BoxedFuture<'a, Result<(), bevy::asset::Error>> {
         Box::pin(async move {
+            debug!("Loading room at {:?}", load_context.path());
             let room = ron::de::from_bytes::<Room>(bytes)?;
             load_context.set_default_asset(LoadedAsset::new(room));
 
@@ -72,109 +106,108 @@ impl AssetLoader for RoomLoader {
     }
 }
 
-/// Event used to cue a room to be loaded
-#[derive(Event, Debug, Default)]
-pub struct LoadRoomEvent {
-    file_path: PathBuf,
-}
-
-impl LoadRoomEvent {
-    pub fn new(path: PathBuf) -> Self {
-        LoadRoomEvent { file_path: path }
-    }
-}
-
 /// Tracks which rooms are currently being loaded.
 #[derive(Resource, Default)]
 struct RoomTracker {
-    rooms: Vec<RoomLoadingStatus>,
-}
-
-// Enum that keeps track of current status of a room being loaded
-#[derive(Debug, Clone)]
-enum RoomLoadingStatus {
-    Loading(Handle<Room>),
-    Parsed(Handle<Room>),
-}
-
-impl RoomLoadingStatus {
-    #[allow(dead_code)]
-    fn is_parsed(&self) -> bool {
-        match self {
-            RoomLoadingStatus::Loading(_) => false,
-            RoomLoadingStatus::Parsed(_) => true,
-        }
-    }
-}
-
-/// Checks for a room load event and ques that room asset for loading
-fn load_room_system(
-    asset_server: Res<AssetServer>,
-    mut load_event: EventReader<LoadRoomEvent>,
-    mut room_tracker: ResMut<RoomTracker>,
-) {
-    for event in load_event.iter() {
-        debug!("Queing room at path {:?} to be loaded", event.file_path);
-        room_tracker.rooms.push(RoomLoadingStatus::Loading(
-            asset_server.load(event.file_path.clone()),
-        ));
-    }
+    rooms: HashMap<Handle<Room>, HashMap<String, (Entity, PrefabData)>>,
 }
 
 /// Checks wether a room asset has been loaded and the parses that room asset and spawns the prefab it has
 fn parse_room_system(
+    mut asset_events: EventReader<AssetEvent<Room>>,
     mut commands: Commands,
     registry: Res<PrefabRegistry>,
     mut room_tracker: ResMut<RoomTracker>,
     room_assets: Res<Assets<Room>>,
     asset_server: Res<AssetServer>,
 ) {
-    if room_tracker.rooms.iter().filter(|r| !r.is_parsed()).count() == 0 {
-        return;
-    }
+    for event in asset_events.iter() {
+        match event {
+            AssetEvent::Created { handle } => {
+                debug!("Room loaded parsing room. Room:{:?}", handle);
+                let room = room_assets.get(handle).unwrap();
 
-    room_tracker.rooms = room_tracker
-        .rooms
-        .iter()
-        .map(|room_status| {
-            if let RoomLoadingStatus::Loading(room_handle) = room_status {
-                if let Some(room) = room_assets.get(room_handle) {
-                    debug!("Parsing room {:?} : {:?}", room_handle, room);
-                    for prefab in &room.prefabs {
-                        let entity = commands.spawn_empty();
-                        registry.spawn(&prefab, entity, &asset_server)
-                    }
-                    RoomLoadingStatus::Parsed(room_handle.clone())
-                } else {
-                    room_status.clone()
-                }
-            } else {
-                room_status.clone()
+                let entities = room
+                    .prefabs
+                    .iter()
+                    .map(|(id, prefab_data)| {
+                        let commands = commands.spawn_empty();
+                        let entity = commands.id();
+                        registry.spawn(prefab_data, commands, &asset_server);
+                        (id.clone(), (entity, prefab_data.clone()))
+                    })
+                    .collect();
+
+                room_tracker.rooms.insert(handle.clone_weak(), entities);
             }
-        })
-        .collect()
+            AssetEvent::Modified { handle } => {
+                debug!("Room modified, reparsing room. Room:{:?}", handle);
+
+                let room = room_assets.get(handle).unwrap();
+
+                let entities: HashMap<String, (Entity, PrefabData)> = room.prefabs.iter().map(|(id, new_prefab)| {
+                    match room_tracker.rooms[handle].get(id) {
+                        Some((entity, old_prefab)) => {
+                            let changed_fields =
+                                PrefabData::get_changed_fields(old_prefab, new_prefab);
+
+                            registry.update(
+                                &new_prefab.prefab_type,
+                                changed_fields,
+                                commands.entity(entity.clone()),
+                                &asset_server,
+                            );
+
+                            (id.clone(), (entity.clone(), new_prefab.clone()))
+                        }
+                        None => {
+                            let commands = commands.spawn_empty();
+                            let entity = commands.id();
+                            registry.spawn(new_prefab, commands, &asset_server);
+                            (id.clone(), (entity, new_prefab.clone()))
+                        },
+                    }
+                }).collect();
+
+                let room_keys : HashSet<&String> = room_tracker.rooms[handle].keys().collect();
+                let new_room_keys = entities.keys().collect();
+
+                let diff = room_keys.difference(&new_room_keys);
+
+                let remove_count = diff
+                    .map(|key| room_tracker.rooms[handle][*key].0)
+                    .map(|entity| commands.entity(entity).despawn())
+                    .count();
+
+                debug!("Removed {} entities", remove_count);
+
+                drop(room_keys);
+                drop(new_room_keys);
+
+                room_tracker.rooms.insert(handle.clone_weak(), entities);
+            }
+            AssetEvent::Removed { handle } => {
+                debug!("Room with handle {handle:?} removed");
+                if let Some(entities) = room_tracker.rooms.remove(handle) {
+                    for (_, (entity, _)) in entities {
+                        commands.entity(entity).despawn();
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// A struct that tracks the spawn functions for all available prefabs
 #[derive(Default, Resource)]
 pub struct PrefabRegistry {
-    prefabs: HashMap<
-        String,
-        Box<dyn Fn(&HashMap<String, PrefabField>, EntityCommands, &AssetServer) + Send + Sync>,
-    >,
+    prefabs: HashMap<String, Box<dyn Prefab + Sync + Send>>,
 }
 
 impl PrefabRegistry {
     /// Register a prefab to the registry
-    pub fn register_prefab(
-        &mut self,
-        name: &str,
-        spawn_fn: impl Fn(&HashMap<String, PrefabField>, EntityCommands, &AssetServer)
-            + 'static
-            + Send
-            + Sync,
-    ) {
-        self.prefabs.insert(name.to_string(), Box::new(spawn_fn));
+    pub fn register_prefab(&mut self, name: &str, prefab: impl Prefab + Sync + Send + 'static) {
+        self.prefabs.insert(name.to_string(), Box::new(prefab));
     }
 
     /// Calls the correct spawn function for a prefab of given type
@@ -184,6 +217,21 @@ impl PrefabRegistry {
         commands: EntityCommands,
         asset_server: &AssetServer,
     ) {
-        self.prefabs[&prefab_data.prefab_type](&prefab_data.fields, commands, asset_server)
+        self.prefabs[&prefab_data.prefab_type].spawn_prfab(
+            &prefab_data.fields,
+            commands,
+            asset_server,
+        )
+    }
+
+    /// Calls the correct update function prefab
+    pub fn update(
+        &self,
+        prefab_type: &String,
+        changed_fields: HashMap<String, PrefabField>,
+        commands: EntityCommands,
+        asset_server: &AssetServer,
+    ) {
+        self.prefabs[prefab_type].update_prfab(&changed_fields, asset_server, commands);
     }
 }
