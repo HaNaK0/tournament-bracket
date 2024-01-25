@@ -1,5 +1,5 @@
-# rustiant
-A bevy project   
+# tornament bracket
+A small project to create a potential tournament bracket for a beerpong tournament
 
 ## Issue on intel integrated graphics
 There is a bug that causes sprite rendering not working on intel graphics.
