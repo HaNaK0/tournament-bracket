@@ -2,18 +2,14 @@ use std::time::Duration;
 
 use bevy::{
     asset::ChangeWatcher, input::common_conditions::input_toggle_active, prelude::*,
-    render::camera::ScalingMode, ecs::entity,
+    render::camera::ScalingMode,
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use pig::PigPlugin;
-use prefab::DefaultPrefabsPlugin;
 use room::RoomPlugin;
 use ui::GameUiPlugin;
 
 use crate::room::Room;
 
-mod pig;
-mod prefab;
 mod room;
 mod ui;
 
@@ -42,11 +38,9 @@ fn main() {
                     watch_for_changes: ChangeWatcher::with_delay(Duration::from_secs_f32(1.0)),
                     ..default()
                 }),
-            PigPlugin,
             WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F3)),
             GameUiPlugin,
             RoomPlugin,
-            DefaultPrefabsPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (movement_system, remove_rooms))
@@ -56,7 +50,7 @@ fn main() {
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>
+    _asset_server: Res<AssetServer>
 ) {
     debug!("set up");
     let mut camera = Camera2dBundle::default();
@@ -68,8 +62,6 @@ fn setup(
 
     commands.spawn(camera);
 
-    let room: Handle<Room> = asset_server.load("rooms/test_room.ron");
-    commands.spawn((Name::new("main_room"), room));
 }
 
 fn movement_system(
