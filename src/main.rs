@@ -50,7 +50,7 @@ fn main() {
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>
+    _asset_server: Res<AssetServer>
 ) {
     debug!("set up");
     let mut camera = Camera2dBundle::default();

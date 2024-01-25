@@ -206,7 +206,7 @@ pub struct PrefabRegistry {
 
 impl PrefabRegistry {
     /// Register a prefab to the registry
-    pub fn register_prefab(&mut self, name: &str, prefab: impl Prefab + Sync + Send + 'static) {
+    pub fn _register_prefab(&mut self, name: &str, prefab: impl Prefab + Sync + Send + 'static) {
         self.prefabs.insert(name.to_string(), Box::new(prefab));
     }
 
